@@ -244,6 +244,21 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             <CheckCircle2 size={18} /> Approve Plan
           </button>
         )}
+        {sessionData?.state === 'AWAITING_USER_FEEDBACK' && (
+          <button
+            onClick={() => {
+               // Send empty message to tell Jules to continue since we just need an unblock
+               fetch(`/api/jules/sessions/${sessionId}:sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ prompt: "Please continue with the current plan." })
+               }).then(() => fetchSessionDetails());
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-blue-700"
+          >
+            <CheckCircle2 size={18} /> Continue
+          </button>
+        )}
       </div>
 
       {/* Activities Area */}
@@ -272,18 +287,27 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             {activity.planGenerated && (
               <div>
                 <span className="font-semibold text-purple-600">Plan Generated:</span>
-                <pre className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {JSON.stringify(activity.planGenerated, null, 2)}
-                </pre>
+                <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
+                  {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
+                    <div key={step.id || idx} className="mb-2">
+                      <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
+                      {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                    </div>
+                  ))}
+                  {!activity.planGenerated.plan?.steps && (
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
+                  )}
+                </div>
               </div>
             )}
 
-            {activity.progressUpdated && (
+            {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
               <div>
                 <span className="font-semibold text-orange-600">Progress:</span>
-                <pre className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {JSON.stringify(activity.progressUpdated, null, 2)}
-                </pre>
+                <div className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
+                  {activity.progressUpdated.title && <p className="font-medium">{activity.progressUpdated.title}</p>}
+                  {activity.progressUpdated.description && <p className="mt-1 text-gray-600">{activity.progressUpdated.description}</p>}
+                </div>
               </div>
             )}
              {/* Fallback for unhandled types or raw dump if needed temporarily */}
