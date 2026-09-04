@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
 
 async function handleProxy(
@@ -28,7 +30,7 @@ async function handleProxy(
     request.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
       // Avoid forwarding host, connection, etc.
-      if (lowerKey !== 'host' && lowerKey !== 'connection' && lowerKey !== 'content-length') {
+      if (lowerKey !== 'host' && lowerKey !== 'connection' && lowerKey !== 'content-length' && lowerKey !== 'accept-encoding') {
         headers.set(key, value);
       }
     });
@@ -39,6 +41,7 @@ async function handleProxy(
     const init: RequestInit = {
       method: request.method,
       headers,
+      cache: 'no-store',
     };
 
     // If it's a POST/PUT/PATCH, forward the body
@@ -54,16 +57,19 @@ async function handleProxy(
 
     const response = await fetch(url, init);
 
-    // Read the response body
-    const responseBody = await response.text();
+    // Read the response body as ArrayBuffer
+    const responseBuffer = await response.arrayBuffer();
 
-    // Reconstruct the response with original status and headers (if needed)
+    // Reconstruct the response with original status and headers
     const newHeaders = new Headers();
     response.headers.forEach((value, key) => {
-      newHeaders.set(key, value);
+      const lowerKey = key.toLowerCase();
+      if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(lowerKey)) {
+        newHeaders.set(key, value);
+      }
     });
 
-    return new NextResponse(responseBody, {
+    return new NextResponse(responseBuffer, {
       status: response.status,
       headers: newHeaders,
     });
