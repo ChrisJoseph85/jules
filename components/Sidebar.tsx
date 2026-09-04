@@ -26,7 +26,10 @@ export default function Sidebar({ onSelectSession, selectedSessionId }: SidebarP
       const res = await fetch('/api/jules/sessions?pageSize=20');
       if (res.ok) {
         const data = await res.json();
-        setSessions(data.sessions || []);
+        const sorted = (data.sessions || []).sort((a: Session, b: Session) =>
+          new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        );
+        setSessions(sorted);
       }
     } catch (error) {
       console.error('Failed to fetch sessions:', error);

@@ -47,10 +47,16 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
 
   useEffect(() => {
     if (sessionId) {
-      const interval = setInterval(fetchSessionDetails, 5000);
+      const interval = setInterval(() => {
+        // Only poll if the session is active and not finished
+        if (sessionData && (sessionData.state === 'COMPLETED' || sessionData.state === 'FAILED')) {
+            return;
+        }
+        fetchSessionDetails();
+      }, 60000);
       return () => clearInterval(interval);
     }
-  }, [sessionId]);
+  }, [sessionId, sessionData?.state]);
 
   useEffect(() => {
     activitiesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -236,87 +242,123 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
           <h1 className="text-xl font-bold truncate">{sessionData?.title || 'Loading session...'}</h1>
           <p className="text-sm text-gray-500">State: {sessionData?.state || '...'}</p>
         </div>
-        {sessionData?.state === 'AWAITING_PLAN_APPROVAL' && (
+        <div className="flex gap-2">
           <button
-            onClick={handleApprovePlan}
-            className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700"
+            onClick={fetchSessionDetails}
+            className="bg-gray-200 text-gray-700 px-4 py-2 rounded-md flex items-center gap-2 hover:bg-gray-300"
           >
-            <CheckCircle2 size={18} /> Approve Plan
+            Reload
           </button>
-        )}
+        </div>
       </div>
 
-      {/* Activities Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50">
-        {activities.map((activity, idx) => (
-          <div key={activity.name || idx} className="bg-white border rounded-lg p-4 shadow-sm">
-            <div className="text-xs text-gray-400 mb-2">{new Date(activity.createTime).toLocaleString()}</div>
+      {/* Two Column Layout */}
+      <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden bg-gray-50">
 
-            {/* Render different activity types here based on activity.* event types */}
-            {activity.userMessaged && (
-              <div>
-                <span className="font-semibold text-blue-600">User:</span>
-                <p className="mt-1 whitespace-pre-wrap">{activity.userMessaged.message}</p>
+        {/* Left Column: Chat and Plan */}
+        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {sessionData?.state === 'AWAITING_PLAN_APPROVAL' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex justify-between items-center">
+                <span className="text-sm text-blue-800">A plan is waiting for your approval.</span>
+                <button
+                  onClick={handleApprovePlan}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 text-sm"
+                >
+                  <CheckCircle2 size={16} /> Approve Plan
+                </button>
               </div>
             )}
 
-            {activity.agentMessaged && (
-              <div>
-                <span className="font-semibold text-green-600">Jules:</span>
-                <div className="mt-1 whitespace-pre-wrap font-mono text-sm bg-gray-100 p-3 rounded overflow-x-auto">
-                  {activity.agentMessaged.message}
-                </div>
-              </div>
-            )}
+            {activities
+              .filter(a => a.userMessaged || a.agentMessaged || a.planGenerated)
+              .map((activity, idx) => (
+              <div key={activity.name || idx} className="bg-gray-50 border rounded-lg p-4">
+                <div className="text-xs text-gray-400 mb-2">{new Date(activity.createTime).toLocaleString()}</div>
 
-            {activity.planGenerated && (
-              <div>
-                <span className="font-semibold text-purple-600">Plan Generated:</span>
-                <pre className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {JSON.stringify(activity.planGenerated, null, 2)}
-                </pre>
-              </div>
-            )}
+                {activity.userMessaged && (
+                  <div>
+                    <span className="font-semibold text-blue-600">User:</span>
+                    <p className="mt-1 whitespace-pre-wrap">{activity.userMessaged.message}</p>
+                  </div>
+                )}
 
-            {activity.progressUpdated && (
-              <div>
-                <span className="font-semibold text-orange-600">Progress:</span>
-                <pre className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {JSON.stringify(activity.progressUpdated, null, 2)}
-                </pre>
+                {activity.agentMessaged && (
+                  <div>
+                    <span className="font-semibold text-green-600">Jules:</span>
+                    <div className="mt-1 whitespace-pre-wrap font-mono text-sm bg-gray-100 p-3 rounded overflow-x-auto">
+                      {activity.agentMessaged.message}
+                    </div>
+                  </div>
+                )}
+
+                {activity.planGenerated && (
+                  <div>
+                    <span className="font-semibold text-purple-600">Plan Generated:</span>
+                    <pre className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
+                      {JSON.stringify(activity.planGenerated, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
-            )}
-             {/* Fallback for unhandled types or raw dump if needed temporarily */}
-             {!activity.userMessaged && !activity.agentMessaged && !activity.planGenerated && !activity.progressUpdated && (
-               <details>
-                 <summary className="text-sm text-gray-500 cursor-pointer">Raw Activity Data</summary>
-                 <pre className="text-xs mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded">{JSON.stringify(activity, null, 2)}</pre>
-               </details>
-             )}
+            ))}
+            <div ref={activitiesEndRef} />
           </div>
-        ))}
-        <div ref={activitiesEndRef} />
-      </div>
 
-      {/* Input Area */}
-      <div className="p-4 bg-white border-t">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Send a message to Jules..."
-            className="flex-1 border rounded-md px-4 py-2"
-            disabled={sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
-          />
-          <button
-            type="submit"
-            disabled={!message || sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
-            className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {sendingMessage ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-          </button>
-        </form>
+          {/* Input Area */}
+          <div className="p-4 bg-gray-50 border-t">
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Send a message to Jules..."
+                className="flex-1 border rounded-md px-4 py-2 bg-white"
+                disabled={sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
+              />
+              <button
+                type="submit"
+                disabled={!message || sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
+                className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {sendingMessage ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Right Column: Progress Updates */}
+        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm">
+          <div className="bg-gray-100 border-b p-3 font-semibold text-gray-700 text-sm">
+            Progress Feed
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {activities
+              .filter(a => a.progressUpdated || (!a.userMessaged && !a.agentMessaged && !a.planGenerated))
+              .map((activity, idx) => (
+              <div key={activity.name || idx} className="bg-gray-50 border rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-2">{new Date(activity.createTime).toLocaleString()}</div>
+
+                {activity.progressUpdated && (
+                  <div>
+                    <span className="font-semibold text-orange-600 text-sm">Progress:</span>
+                    <pre className="mt-1 whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded">
+                      {JSON.stringify(activity.progressUpdated, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                {!activity.userMessaged && !activity.agentMessaged && !activity.planGenerated && !activity.progressUpdated && (
+                  <details>
+                    <summary className="text-sm text-gray-500 cursor-pointer">Raw Activity Data</summary>
+                    <pre className="text-xs mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded">{JSON.stringify(activity, null, 2)}</pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );
