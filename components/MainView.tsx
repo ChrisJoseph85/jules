@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -28,6 +28,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [selectedSource, setSelectedSource] = useState('');
   const [startingBranch, setStartingBranch] = useState('main');
   const [requireApproval, setRequireApproval] = useState(false);
+  const [autoCreatePr, setAutoCreatePr] = useState(false);
   const [creating, setCreating] = useState(false);
 
   // Active Session State
@@ -36,7 +37,6 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [loadingSession, setLoadingSession] = useState(false);
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const activitiesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -129,7 +129,8 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             source: selectedSource,
             githubRepoContext: { startingBranch }
           },
-          requirePlanApproval: requireApproval
+          requirePlanApproval: requireApproval,
+          automationMode: autoCreatePr ? 'AUTO_CREATE_PR' : 'AUTOMATION_MODE_UNSPECIFIED'
         })
       });
       if (res.ok) {
@@ -225,15 +226,28 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="requireApproval"
-              checked={requireApproval}
-              onChange={(e) => setRequireApproval(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="requireApproval" className="text-sm">Require Plan Approval</label>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="requireApproval"
+                checked={requireApproval}
+                onChange={(e) => setRequireApproval(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="requireApproval" className="text-sm">Require Plan Approval</label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="autoCreatePr"
+                checked={autoCreatePr}
+                onChange={(e) => setAutoCreatePr(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="autoCreatePr" className="text-sm">Auto-Create PR</label>
+            </div>
           </div>
 
           <button
@@ -248,10 +262,13 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
     );
   }
 
+  const conversationActivities = activities.filter(a => a.userMessaged || a.agentMessaged || a.planGenerated);
+  const progressActivities = activities.filter(a => a.progressUpdated || (!a.userMessaged && !a.agentMessaged && !a.planGenerated));
+
   return (
     <div className="flex-1 flex flex-col h-screen w-full">
       {/* Header */}
-      <div className="p-4 border-b bg-white flex justify-between items-center">
+      <div className="p-4 border-b bg-white flex justify-between items-center shrink-0">
         <div>
           <h1 className="text-xl font-bold truncate">{sessionData?.title || 'Loading session...'}</h1>
           <p className="text-sm text-gray-500">State: {sessionData?.state || '...'}</p>
@@ -301,22 +318,25 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
               </div>
             )}
 
-            {activity.planGenerated && (
-              <div>
-                <span className="font-semibold text-purple-600">Plan Generated:</span>
-                <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
-                  {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
-                    <div key={step.id || idx} className="mb-2">
-                      <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
-                      {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                  {activity.planGenerated && (
+                    <div>
+                      <span className="font-semibold text-purple-600">Plan Generated:</span>
+                      <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
+                        {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
+                          <div key={step.id || idx} className="mb-2">
+                            <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
+                            {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                          </div>
+                        ))}
+                        {!activity.planGenerated.plan?.steps && (
+                          <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                  {!activity.planGenerated.plan?.steps && (
-                    <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
                   )}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
 
             {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
               <div>

@@ -19,7 +19,6 @@ interface SidebarProps {
 export default function Sidebar({ onSelectSession, selectedSessionId }: SidebarProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOpen, setIsOpen] = useState(true);
 
   const fetchSessions = async () => {
     try {
@@ -42,30 +41,12 @@ export default function Sidebar({ onSelectSession, selectedSessionId }: SidebarP
     fetchSessions();
   }, []);
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="p-2 m-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md fixed z-10"
-        title="Open Sidebar"
-      >
-        <PanelLeftOpen size={24} />
-      </button>
-    );
-  }
-
   return (
     <div className="w-full h-screen border-r bg-gray-50 flex flex-col transition-all duration-300 relative">
       <div className="p-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-lg flex items-center gap-2">
           Jules
         </h2>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-gray-200 rounded-md"
-        >
-          <PanelLeftClose size={20} />
-        </button>
       </div>
 
       <div className="p-2">
