@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 interface Source {
   name: string;
@@ -27,6 +28,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [selectedSource, setSelectedSource] = useState('');
   const [startingBranch, setStartingBranch] = useState('main');
   const [requireApproval, setRequireApproval] = useState(false);
+  const [autoCreatePr, setAutoCreatePr] = useState(false);
   const [creating, setCreating] = useState(false);
 
   // Active Session State
@@ -35,7 +37,6 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [loadingSession, setLoadingSession] = useState(false);
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const activitiesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -51,10 +52,6 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
       return () => clearInterval(interval);
     }
   }, [sessionId]);
-
-  useEffect(() => {
-    activitiesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activities]);
 
   const fetchSources = async () => {
     setLoadingSources(true);
@@ -109,7 +106,8 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             source: selectedSource,
             githubRepoContext: { startingBranch }
           },
-          requirePlanApproval: requireApproval
+          requirePlanApproval: requireApproval,
+          automationMode: autoCreatePr ? 'AUTO_CREATE_PR' : 'AUTOMATION_MODE_UNSPECIFIED'
         })
       });
       if (res.ok) {
@@ -158,7 +156,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
 
   if (!sessionId) {
     return (
-      <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full">
+      <div className="flex-1 flex flex-col p-8 w-full h-full overflow-y-auto">
         <h1 className="text-3xl font-bold mb-8">Start a New Session</h1>
         <form onSubmit={handleCreateSession} className="space-y-6 bg-white p-6 rounded-lg border shadow-sm">
           <div>
@@ -205,15 +203,28 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="requireApproval"
-              checked={requireApproval}
-              onChange={(e) => setRequireApproval(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="requireApproval" className="text-sm">Require Plan Approval</label>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="requireApproval"
+                checked={requireApproval}
+                onChange={(e) => setRequireApproval(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="requireApproval" className="text-sm">Require Plan Approval</label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="autoCreatePr"
+                checked={autoCreatePr}
+                onChange={(e) => setAutoCreatePr(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="autoCreatePr" className="text-sm">Auto-Create PR</label>
+            </div>
           </div>
 
           <button
@@ -228,10 +239,13 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
     );
   }
 
+  const conversationActivities = activities.filter(a => a.userMessaged || a.agentMessaged || a.planGenerated);
+  const progressActivities = activities.filter(a => a.progressUpdated || (!a.userMessaged && !a.agentMessaged && !a.planGenerated));
+
   return (
-    <div className="flex-1 flex flex-col h-screen max-w-5xl mx-auto w-full">
+    <div className="flex-1 flex flex-col h-full w-full bg-white">
       {/* Header */}
-      <div className="p-4 border-b bg-white flex justify-between items-center">
+      <div className="p-4 border-b bg-white flex justify-between items-center shrink-0">
         <div>
           <h1 className="text-xl font-bold truncate">{sessionData?.title || 'Loading session...'}</h1>
           <p className="text-sm text-gray-500">State: {sessionData?.state || '...'}</p>
@@ -262,85 +276,108 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
       </div>
 
       {/* Activities Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50">
-        {activities.map((activity, idx) => (
-          <div key={activity.name || idx} className="bg-white border rounded-lg p-4 shadow-sm">
-            <div className="text-xs text-gray-400 mb-2">{new Date(activity.createTime).toLocaleString()}</div>
+      <div className="flex-1 overflow-hidden min-h-0">
+        <PanelGroup direction="horizontal">
+          {/* Conversation Panel */}
+          <Panel defaultSize={60} minSize={30} className="flex flex-col h-full bg-gray-50 border-r">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {conversationActivities.map((activity, idx) => (
+                <div key={activity.name || idx} className="bg-white border rounded-lg p-4 shadow-sm">
+                  <div className="text-xs text-gray-400 mb-2">{new Date(activity.createTime).toLocaleString()}</div>
 
-            {/* Render different activity types here based on activity.* event types */}
-            {activity.userMessaged && (
-              <div>
-                <span className="font-semibold text-blue-600">User:</span>
-                <p className="mt-1 whitespace-pre-wrap">{activity.userMessaged.message}</p>
-              </div>
-            )}
-
-            {activity.agentMessaged && (
-              <div>
-                <span className="font-semibold text-green-600">Jules:</span>
-                <div className="mt-1 whitespace-pre-wrap font-mono text-sm bg-gray-100 p-3 rounded overflow-x-auto">
-                  {activity.agentMessaged.message}
-                </div>
-              </div>
-            )}
-
-            {activity.planGenerated && (
-              <div>
-                <span className="font-semibold text-purple-600">Plan Generated:</span>
-                <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
-                  {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
-                    <div key={step.id || idx} className="mb-2">
-                      <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
-                      {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                  {activity.userMessaged && (
+                    <div>
+                      <span className="font-semibold text-blue-600">User:</span>
+                      <p className="mt-1 whitespace-pre-wrap">{activity.userMessaged.message}</p>
                     </div>
-                  ))}
-                  {!activity.planGenerated.plan?.steps && (
-                    <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
+                  )}
+
+                  {activity.agentMessaged && (
+                    <div>
+                      <span className="font-semibold text-green-600">Jules:</span>
+                      <div className="mt-1 whitespace-pre-wrap font-mono text-sm bg-gray-100 p-3 rounded overflow-x-auto">
+                        {activity.agentMessaged.message}
+                      </div>
+                    </div>
+                  )}
+
+                  {activity.planGenerated && (
+                    <div>
+                      <span className="font-semibold text-purple-600">Plan Generated:</span>
+                      <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
+                        {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
+                          <div key={step.id || idx} className="mb-2">
+                            <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
+                            {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                          </div>
+                        ))}
+                        {!activity.planGenerated.plan?.steps && (
+                          <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
 
-            {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
-              <div>
-                <span className="font-semibold text-orange-600">Progress:</span>
-                <div className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {activity.progressUpdated.title && <p className="font-medium">{activity.progressUpdated.title}</p>}
-                  {activity.progressUpdated.description && <p className="mt-1 text-gray-600">{activity.progressUpdated.description}</p>}
+            {/* Input Area */}
+            <div className="p-4 bg-white border-t shrink-0">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Send a message to Jules..."
+                  className="flex-1 border rounded-md px-4 py-2"
+                  disabled={sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
+                />
+                <button
+                  type="submit"
+                  disabled={!message || sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
+                  className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {sendingMessage ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                </button>
+              </form>
+            </div>
+          </Panel>
+
+          <PanelResizeHandle className="w-2 bg-gray-200 hover:bg-gray-300 cursor-col-resize transition-colors" />
+
+          {/* Progress Panel */}
+          <Panel defaultSize={40} minSize={20} className="flex flex-col h-full bg-gray-50">
+            <div className="p-3 border-b bg-gray-100 shrink-0">
+              <h2 className="text-sm font-semibold text-gray-700 uppercase">Progress & Logs</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {progressActivities.map((activity, idx) => (
+                <div key={activity.name || idx} className="bg-white border rounded p-3 shadow-sm text-sm">
+                  <div className="text-xs text-gray-400 mb-1">{new Date(activity.createTime).toLocaleString()}</div>
+
+                  {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
+                    <div>
+                      <span className="font-semibold text-orange-600">Progress:</span>
+                      <div className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded border">
+                        {activity.progressUpdated.title && <p className="font-medium text-gray-800">{activity.progressUpdated.title}</p>}
+                        {activity.progressUpdated.description && <p className="mt-1 text-gray-600 text-xs">{activity.progressUpdated.description}</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  {!activity.userMessaged && !activity.agentMessaged && !activity.planGenerated && !activity.progressUpdated && (
+                    <details>
+                      <summary className="text-xs text-gray-500 cursor-pointer">Raw Activity Data</summary>
+                      <pre className="text-[10px] mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded overflow-x-auto">
+                        {JSON.stringify(activity, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </div>
-              </div>
-            )}
-             {/* Fallback for unhandled types or raw dump if needed temporarily */}
-             {!activity.userMessaged && !activity.agentMessaged && !activity.planGenerated && !activity.progressUpdated && (
-               <details>
-                 <summary className="text-sm text-gray-500 cursor-pointer">Raw Activity Data</summary>
-                 <pre className="text-xs mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded">{JSON.stringify(activity, null, 2)}</pre>
-               </details>
-             )}
-          </div>
-        ))}
-        <div ref={activitiesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="p-4 bg-white border-t">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Send a message to Jules..."
-            className="flex-1 border rounded-md px-4 py-2"
-            disabled={sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
-          />
-          <button
-            type="submit"
-            disabled={!message || sendingMessage || sessionData?.state === 'COMPLETED' || sessionData?.state === 'FAILED'}
-            className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {sendingMessage ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-          </button>
-        </form>
+              ))}
+            </div>
+          </Panel>
+        </PanelGroup>
       </div>
     </div>
   );
