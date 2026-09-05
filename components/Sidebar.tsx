@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Menu, Plus, MessageSquare, Loader2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Plus, MessageSquare, Loader2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface Session {
   name: string;
@@ -26,7 +26,10 @@ export default function Sidebar({ onSelectSession, selectedSessionId }: SidebarP
       const res = await fetch('/api/jules/sessions?pageSize=20');
       if (res.ok) {
         const data = await res.json();
-        setSessions(data.sessions || []);
+        const sorted = (data.sessions || []).sort((a: Session, b: Session) =>
+          new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        );
+        setSessions(sorted);
       }
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
@@ -52,10 +55,10 @@ export default function Sidebar({ onSelectSession, selectedSessionId }: SidebarP
   }
 
   return (
-    <div className="w-64 h-screen border-r bg-gray-50 flex flex-col transition-all duration-300 relative">
+    <div className="w-full h-screen border-r bg-gray-50 flex flex-col transition-all duration-300 relative">
       <div className="p-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-lg flex items-center gap-2">
-          <Menu size={20} /> Jules
+          Jules
         </h2>
         <button
           onClick={() => setIsOpen(false)}

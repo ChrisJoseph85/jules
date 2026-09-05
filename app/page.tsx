@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import MainView from '@/components/MainView';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 export default function Home() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -13,14 +14,21 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
-      <Sidebar
-        onSelectSession={setSelectedSessionId}
-        selectedSessionId={selectedSessionId}
-      />
-      <MainView
-        sessionId={selectedSessionId}
-        onSessionCreated={handleSessionCreated}
-      />
+      <PanelGroup direction="horizontal">
+        <Panel defaultSize={20} minSize={15} maxSize={30}>
+          <Sidebar
+            onSelectSession={setSelectedSessionId}
+            selectedSessionId={selectedSessionId}
+          />
+        </Panel>
+        <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors" />
+        <Panel defaultSize={80}>
+          <MainView
+            sessionId={selectedSessionId}
+            onSessionCreated={handleSessionCreated}
+          />
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }
