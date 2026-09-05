@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -37,6 +37,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [loadingSession, setLoadingSession] = useState(false);
   const [message, setMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const activitiesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -280,7 +281,6 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
           >
             Reload
           </button>
-        )}
         {sessionData?.state === 'AWAITING_USER_FEEDBACK' && (
           <button
             onClick={() => {
@@ -296,6 +296,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             <CheckCircle2 size={18} /> Continue
           </button>
         )}
+        </div>
       </div>
 
       {/* Two Column Layout */}
@@ -318,33 +319,33 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
               </div>
             )}
 
-                  {activity.planGenerated && (
-                    <div>
-                      <span className="font-semibold text-purple-600">Plan Generated:</span>
-                      <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
-                        {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
-                          <div key={step.id || idx} className="mb-2">
-                            <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
-                            {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
-                          </div>
-                        ))}
-                        {!activity.planGenerated.plan?.steps && (
-                          <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
-                        )}
-                      </div>
+            {conversationActivities.map((activity, idx) => (
+              <div key={activity.name || idx} className="bg-white border rounded-lg p-4 shadow-sm">
+                {activity.planGenerated && (
+                  <div>
+                    <span className="font-semibold text-purple-600">Plan Generated:</span>
+                    <div className="mt-1 text-sm bg-gray-100 p-3 rounded">
+                      {activity.planGenerated.plan?.steps?.map((step: any, idx: number) => (
+                        <div key={step.id || idx} className="mb-2">
+                          <p className="font-medium">{step.index !== undefined ? step.index + 1 : idx + 1}. {step.title}</p>
+                          {step.description && <p className="text-gray-600 ml-4 whitespace-pre-wrap">{step.description}</p>}
+                        </div>
+                      ))}
+                      {!activity.planGenerated.plan?.steps && (
+                        <pre className="whitespace-pre-wrap">{JSON.stringify(activity.planGenerated, null, 2)}</pre>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
-              <div>
-                <span className="font-semibold text-orange-600">Progress:</span>
-                <div className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
-                  {activity.progressUpdated.title && <p className="font-medium">{activity.progressUpdated.title}</p>}
-                  {activity.progressUpdated.description && <p className="mt-1 text-gray-600">{activity.progressUpdated.description}</p>}
-                </div>
+                  </div>
+                )}
+                {activity.progressUpdated && (activity.progressUpdated.title || activity.progressUpdated.description) && (
+                  <div>
+                    <span className="font-semibold text-orange-600">Progress:</span>
+                    <div className="mt-1 whitespace-pre-wrap text-sm bg-gray-100 p-3 rounded">
+                      {activity.progressUpdated.title && <p className="font-medium">{activity.progressUpdated.title}</p>}
+                      {activity.progressUpdated.description && <p className="mt-1 text-gray-600">{activity.progressUpdated.description}</p>}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             <div ref={activitiesEndRef} />
