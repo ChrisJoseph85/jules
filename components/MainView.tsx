@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 interface Source {
   name: string;
@@ -58,8 +59,21 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
     }
   }, [sessionId, sessionData?.state]);
 
+  // Auto-scroll logic: only scroll if already at bottom or slightly above
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
+    if (activitiesEndRef.current) {
+        // Stash scroll state on the ref element as a data attribute to avoid extra state renders
+        activitiesEndRef.current.dataset.atBottom = String(isAtBottom);
+    }
+  };
+
   useEffect(() => {
-    activitiesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const isAtBottom = activitiesEndRef.current?.dataset.atBottom !== 'false';
+    if (isAtBottom) {
+      activitiesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [activities]);
 
   const fetchSources = async () => {
@@ -164,7 +178,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
 
   if (!sessionId) {
     return (
-      <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full">
+      <div className="flex-1 flex flex-col p-8 w-full">
         <h1 className="text-3xl font-bold mb-8">Start a New Session</h1>
         <form onSubmit={handleCreateSession} className="space-y-6 bg-white p-6 rounded-lg border shadow-sm">
           <div>
@@ -235,7 +249,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   }
 
   return (
-    <div className="flex-1 flex flex-col h-screen max-w-5xl mx-auto w-full">
+    <div className="flex-1 flex flex-col h-screen w-full">
       {/* Header */}
       <div className="p-4 border-b bg-white flex justify-between items-center">
         <div>
@@ -253,11 +267,13 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
       </div>
 
       {/* Two Column Layout */}
-      <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden bg-gray-50">
+      <div className="flex-1 p-4 overflow-hidden bg-gray-50">
+      <PanelGroup direction="horizontal">
 
         {/* Left Column: Chat and Plan */}
-        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm">
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <Panel defaultSize={60} minSize={30}>
+        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm mr-2">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6" onScroll={handleScroll}>
             {sessionData?.state === 'AWAITING_PLAN_APPROVAL' && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 flex justify-between items-center">
                 <span className="text-sm text-blue-800">A plan is waiting for your approval.</span>
@@ -326,9 +342,13 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             </form>
           </div>
         </div>
+        </Panel>
+
+        <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize transition-colors rounded" />
 
         {/* Right Column: Progress Updates */}
-        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm">
+        <Panel defaultSize={40} minSize={20}>
+        <div className="flex flex-col h-full bg-white border rounded-lg overflow-hidden shadow-sm ml-2">
           <div className="bg-gray-100 border-b p-3 font-semibold text-gray-700 text-sm">
             Progress Feed
           </div>
@@ -358,7 +378,8 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
             ))}
           </div>
         </div>
-
+        </Panel>
+      </PanelGroup>
       </div>
     </div>
   );
