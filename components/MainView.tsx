@@ -39,6 +39,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [sendingMessage, setSendingMessage] = useState(false);
   const activitiesEndRef = useRef<HTMLDivElement>(null);
 
+
   const fetchSessionDetails = React.useCallback(async () => {
     if (!sessionId) return;
     try {
