@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Send, CheckCircle2 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -39,13 +39,33 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
   const [sendingMessage, setSendingMessage] = useState(false);
   const activitiesEndRef = useRef<HTMLDivElement>(null);
 
+  const fetchSessionDetails = React.useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const [sessionRes, activitiesRes] = await Promise.all([
+        fetch(`/api/jules/sessions/${sessionId}`),
+        fetch(`/api/jules/sessions/${sessionId}/activities?pageSize=50`)
+      ]);
+
+      if (sessionRes.ok) {
+        setSessionData(await sessionRes.json());
+      }
+      if (activitiesRes.ok) {
+        const actData = await activitiesRes.json();
+        setActivities((actData.activities || []).reverse());
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [sessionId]);
+
   useEffect(() => {
     if (!sessionId) {
       fetchSources();
     } else {
       fetchSessionDetails();
     }
-  }, [sessionId]);
+  }, [sessionId, fetchSessionDetails]);
 
   useEffect(() => {
     if (sessionId) {
@@ -58,7 +78,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
       }, 60000);
       return () => clearInterval(interval);
     }
-  }, [sessionId, sessionData?.state]);
+  }, [sessionId, sessionData?.state, sessionData, fetchSessionDetails]);
 
   // Auto-scroll logic: only scroll if already at bottom or slightly above
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -95,25 +115,7 @@ export default function MainView({ sessionId, onSessionCreated }: MainViewProps)
     }
   };
 
-  const fetchSessionDetails = async () => {
-    if (!sessionId) return;
-    try {
-      const [sessionRes, activitiesRes] = await Promise.all([
-        fetch(`/api/jules/sessions/${sessionId}`),
-        fetch(`/api/jules/sessions/${sessionId}/activities?pageSize=50`)
-      ]);
 
-      if (sessionRes.ok) {
-        setSessionData(await sessionRes.json());
-      }
-      if (activitiesRes.ok) {
-        const actData = await activitiesRes.json();
-        setActivities((actData.activities || []).reverse());
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
