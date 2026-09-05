@@ -5,7 +5,6 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MainView from '@/components/MainView';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 export default function Home() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
