@@ -110,10 +110,17 @@ function getHeaders() {
   };
 }
 
-async function apiFetch(endpoint, options = {}) {
+async function apiFetch(endpoint, options = {}, retries = 3) {
   trackApiCall();
   const headers = { ...getHeaders(), ...(options.headers || {}) };
   const res = await fetch(endpoint, { ...options, headers });
+
+  if (res.status === 429 && retries > 0) {
+    const delay = Math.pow(2, 4 - retries) * 1000 + Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return apiFetch(endpoint, options, retries - 1);
+  }
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error?.message || `HTTP ${res.status}`);
@@ -796,6 +803,18 @@ function createActivityElement(act) {
     card.appendChild(approveDiv);
   }
 
+  if (act.agentMessaged && state.activeSession?.state === 'AWAITING_USER_FEEDBACK') {
+    const continueDiv = document.createElement('div');
+    continueDiv.className = 'pt-3 border-t border-slate-800 flex justify-end';
+    continueDiv.innerHTML = `
+      <button onclick="handleContinue()" class="px-4 py-1.5 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition">
+        <i data-lucide="play" class="w-4 h-4"></i>
+        <span>Continue</span>
+      </button>
+    `;
+    card.appendChild(continueDiv);
+  }
+
   return card;
 }
 
@@ -895,6 +914,32 @@ async function approvePlan() {
     await fetchAndCacheActivities(state.selectedSessionId, true);
   } catch (err) {
     alert(`Failed to approve plan: ${err.message}`);
+  }
+}
+
+async function handleContinue() {
+  if (!state.selectedSessionId) return;
+
+  try {
+    await apiFetch(`/api/sessions/${state.selectedSessionId}/sendMessage`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: 'Continue' })
+    });
+
+    const userAct = {
+      id: 'opt_' + Date.now(),
+      originator: 'user',
+      createTime: new Date().toISOString(),
+      userMessaged: { userMessage: 'Continue' }
+    };
+
+    if (!state.activitiesCache[state.selectedSessionId]) {
+      state.activitiesCache[state.selectedSessionId] = [];
+    }
+    state.activitiesCache[state.selectedSessionId].push(userAct);
+    renderActivities();
+  } catch (err) {
+    alert(`Failed to send continue message: ${err.message}`);
   }
 }
 
